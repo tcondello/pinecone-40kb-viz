@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinecone 40 KB metadata budget visualizer</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-2: #f5f4ef;
+    --bg-3: #edece6;
+    --text: #1a1a19;
+    --text-2: #6b6a64;
+    --text-3: #8a8982;
+    --border: rgba(0,0,0,0.12);
+    --border-2: rgba(0,0,0,0.22);
+    --blue: #378ADD;
+    --teal: #1D9E75;
+    --coral: #D85A30;
+    --purple: #7F77DD;
+    --red: #E24B4A;
+    --red-d: #A32D2D;
+    --amber-bg: #FAEEDA;
+    --amber-text: #633806;
+    --green-bg: #EAF3DE;
+    --green-text: #27500A;
+    --red-bg: #FCEBEB;
+    --red-text: #791F1F;
+    --info-bg: #E6F1FB;
+    --info-text: #0C447C;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a19;
+      --bg-2: #262624;
+      --bg-3: #2e2e2c;
+      --text: #f0efe9;
+      --text-2: #a8a79f;
+      --text-3: #7f7e77;
+      --border: rgba(255,255,255,0.12);
+      --border-2: rgba(255,255,255,0.22);
+      --amber-bg: #412402;
+      --amber-text: #FAC775;
+      --green-bg: #173404;
+      --green-text: #C0DD97;
+      --red-bg: #501313;
+      --red-text: #F7C1C1;
+      --info-bg: #042C53;
+      --info-text: #B5D4F4;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    font-size: 14px;
+    color: var(--text-2);
+    margin: 0 0 2rem;
+  }
+
+  .group-title {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-3);
+    margin: 1.75rem 0 0.75rem;
+  }
+  .group-title .hint {
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-3);
+    font-weight: 400;
+  }
+
+  .track {
+    background: var(--bg-2);
+    border-radius: 6px;
+    height: 36px;
+    display: flex;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    transition: width 0.15s ease, background 0.15s ease;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .lab {
+    font-size: 14px;
+    color: var(--text-2);
+    min-width: 180px;
+  }
+  .val {
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 95px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: none;
+    transition: transform 0.1s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    background: transparent;
+    border: 0.5px solid var(--border-2);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: inherit;
+    transition: background 0.1s, transform 0.1s;
+  }
+  .btn:hover { background: var(--bg-2); }
+  .btn:active { transform: scale(0.98); }
+
+  .card {
+    background: var(--bg-2);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .card-lab {
+    font-size: 13px;
+    color: var(--text-2);
+    margin: 0 0 4px;
+  }
+  .card-val {
+    font-size: 22px;
+    font-weight: 500;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .card-hint {
+    font-size: 11px;
+    color: var(--text-3);
+    margin: 2px 0 0;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin: 1.25rem 0;
+  }
+
+  .presets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+    align-items: center;
+  }
+  .presets-lab {
+    font-size: 13px;
+    color: var(--text-2);
+    margin-right: 4px;
+  }
+
+  .pre {
+    background: var(--bg-2);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+    margin: 0;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .pre-lab {
+    font-size: 13px;
+    color: var(--text-2);
+    margin: 0 0 6px;
+  }
+
+  .leg {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .sw {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .bar-wrap {
+    margin-bottom: 0.75rem;
+  }
+  .bar-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .bar-top .label { color: var(--text-2); }
+  .bar-top .bytes {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .bar-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .status {
+    margin-top: 1rem;
+    padding: 12px 14px;
+    border-radius: var(--radius);
+    font-size: 14px;
+  }
+
+  .type-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 0.5rem;
+  }
+  .type-table th, .type-table td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 0.5px solid var(--border);
+    vertical-align: top;
+  }
+  .type-table th {
+    font-weight: 500;
+    color: var(--text-2);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .type-table td code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--bg-2);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .type-table tbody tr:last-child td { border-bottom: none; }
+
+  .notes {
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 0.5px solid var(--border);
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.7;
+  }
+  .notes p { margin: 0 0 0.75rem; }
+  .notes code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: var(--bg-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+  .notes strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .notes a {
+    color: var(--blue);
+    text-decoration: none;
+  }
+  .notes a:hover { text-decoration: underline; }
+  .notes ul {
+    margin: 0.25rem 0 0.75rem;
+    padding-left: 1.25rem;
+  }
+  .notes ul li { margin-bottom: 0.25rem; }
+
+  .ta-wrap { margin-top: 0.5rem; }
+  textarea.ta {
+    width: 100%;
+    min-height: 140px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    padding: 12px 14px;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+    color: var(--text);
+    resize: vertical;
+    line-height: 1.55;
+    outline: none;
+    box-sizing: border-box;
+  }
+  textarea.ta:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(55, 138, 221, 0.15);
+  }
+  .ta-actions { display: flex; gap: 8px; margin: 10px 0 14px; flex-wrap: wrap; }
+  .ta-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .ta-bar-top {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin: 0 0 6px;
+  }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .pill {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--bg-2);
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .pill.has { color: var(--text); background: var(--bg-3); }
+  .issue {
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .issue-err { background: var(--red-bg); color: var(--red-text); }
+  .issue-warn { background: var(--amber-bg); color: var(--amber-text); }
+  .issue-ok { background: var(--green-bg); color: var(--green-text); }
+  .issue-info { background: var(--info-bg); color: var(--info-text); }
+  .issue-icon {
+    flex-shrink: 0;
+    font-weight: 500;
+    font-family: var(--font-mono);
+  }
+  .issue code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    background: rgba(0,0,0,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .issue code { background: rgba(255,255,255,0.1); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pinecone 40 KB metadata budget visualizer</h1>
+  <p class="sub">Pinecone allows up to 40,960 bytes of metadata per record, measured as the UTF-8 byte size of the JSON-stringified flat object. Different value types cost different amounts — strings wear quotes, numbers and booleans don't, lists pay bracket and comma overhead per item.</p>
+
+  <div class="bar-wrap">
+    <div class="bar-top">
+      <span class="label">Metadata budget</span>
+      <span class="bytes" id="bytes">0 / 40,960 bytes</span>
+    </div>
+    <div class="track">
+      <div class="fill" id="f-text" style="width: 0%; background: var(--blue);"></div>
+      <div class="fill" id="f-str" style="width: 0%; background: var(--teal);"></div>
+      <div class="fill" id="f-scal" style="width: 0%; background: var(--coral);"></div>
+      <div class="fill" id="f-list" style="width: 0%; background: var(--purple);"></div>
+    </div>
+    <div class="bar-legend">
+      <span class="leg"><span class="sw" style="background: var(--blue);"></span>chunk_text</span>
+      <span class="leg"><span class="sw" style="background: var(--teal);"></span>String fields</span>
+      <span class="leg"><span class="sw" style="background: var(--coral);"></span>Scalar fields</span>
+      <span class="leg"><span class="sw" style="background: var(--purple);"></span>List fields + overhead</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <p class="card-lab">Bytes used</p>
+      <p class="card-val" id="used">0</p>
+    </div>
+    <div class="card">
+      <p class="card-lab">Bytes remaining</p>
+      <p class="card-val" id="rem">40,960</p>
+    </div>
+    <div class="card">
+      <p class="card-lab">More string fields that fit</p>
+      <p class="card-val" id="more">—</p>
+      <p class="card-hint" id="more-hint">at current key &amp; value size</p>
+    </div>
+  </div>
+
+  <div class="presets">
+    <span class="presets-lab">Presets:</span>
+    <button class="btn" onclick="apply('minimal')">Minimal</button>
+    <button class="btn" onclick="apply('docs')">Pinecone docs example</button>
+    <button class="btn" onclick="apply('rag')">Typical RAG</button>
+    <button class="btn" onclick="apply('multitenant')">Rich multi-tenant</button>
+    <button class="btn" onclick="apply('textheavy')">Text-heavy</button>
+    <button class="btn" onclick="apply('maxfields')">Max fields</button>
+  </div>
+
+  <div class="group-title">Content</div>
+  <div class="row">
+    <label class="lab" for="tok">chunk_text (tokens)</label>
+    <input type="range" min="0" max="10000" step="64" value="1024" id="tok">
+    <span class="val" id="tok-v">1,024 tok</span>
+  </div>
+  <div class="row">
+    <label class="lab" for="k">Avg key length</label>
+    <input type="range" min="3" max="40" step="1" value="10" id="k">
+    <span class="val" id="k-v">10 chars</span>
+  </div>
+
+  <div class="group-title">String fields <span class="hint">— e.g. document_id, title, author, url</span></div>
+  <div class="row">
+    <label class="lab" for="ns">Number of string fields</label>
+    <input type="range" min="0" max="30" step="1" value="3" id="ns">
+    <span class="val" id="ns-v">3</span>
+  </div>
+  <div class="row">
+    <label class="lab" for="sv">Avg string value length</label>
+    <input type="range" min="1" max="500" step="1" value="25" id="sv">
+    <span class="val" id="sv-v">25 chars</span>
+  </div>
+
+  <div class="group-title">Scalar fields <span class="hint">— integers, floats, booleans (unquoted)</span></div>
+  <div class="row">
+    <label class="lab" for="nn">Number of scalar fields</label>
+    <input type="range" min="0" max="30" step="1" value="2" id="nn">
+    <span class="val" id="nn-v">2</span>
+  </div>
+
+  <div class="group-title">List fields <span class="hint">— lists of strings only, e.g. tags, categories</span></div>
+  <div class="row">
+    <label class="lab" for="nl">Number of list fields</label>
+    <input type="range" min="0" max="15" step="1" value="1" id="nl">
+    <span class="val" id="nl-v">1</span>
+  </div>
+  <div class="row">
+    <label class="lab" for="li">Items per list</label>
+    <input type="range" min="1" max="30" step="1" value="5" id="li">
+    <span class="val" id="li-v">5</span>
+  </div>
+  <div class="row">
+    <label class="lab" for="lv">Avg item length</label>
+    <input type="range" min="1" max="80" step="1" value="8" id="lv">
+    <span class="val" id="lv-v">8 chars</span>
+  </div>
+
+  <div style="margin-top: 1.5rem;">
+    <p class="pre-lab">Example JSON payload (what Pinecone would serialize)</p>
+    <pre class="pre" id="prev"></pre>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="group-title" style="margin-top: 2.5rem;">Analyze your own JSON <span class="hint">— paste real metadata to check bytes &amp; Pinecone compliance</span></div>
+  <div class="ta-wrap">
+    <textarea class="ta" id="ta" spellcheck="false" placeholder='Paste metadata JSON here, e.g.
+{
+  "document_id": "doc1",
+  "chunk_text": "First chunk of content...",
+  "chunk_number": 1,
+  "is_public": true,
+  "tags": ["intro", "guide"]
+}'></textarea>
+    <div class="ta-actions">
+      <button class="btn" onclick="loadExample()">Load docs example</button>
+      <button class="btn" onclick="loadBigExample()">Load 35 KB example</button>
+      <button class="btn" onclick="clearTa()">Clear</button>
+    </div>
+
+    <div id="ta-results" style="display: none;">
+      <div class="ta-bar-top">
+        <span style="color: var(--text-2);">Your JSON</span>
+        <span id="ta-bytes" style="font-weight: 500; font-variant-numeric: tabular-nums;">— bytes</span>
+      </div>
+      <div class="track" style="margin-bottom: 10px;">
+        <div class="fill" id="ta-fill" style="width: 0%; background: var(--teal);"></div>
+      </div>
+
+      <div class="ta-summary">
+        <div class="card">
+          <p class="card-lab">Exact UTF-8 bytes</p>
+          <p class="card-val" id="ta-exact">—</p>
+          <p class="card-hint" id="ta-char-diff">0 multi-byte chars</p>
+        </div>
+        <div class="card">
+          <p class="card-lab">Budget remaining</p>
+          <p class="card-val" id="ta-rem">—</p>
+          <p class="card-hint" id="ta-pct">0% used</p>
+        </div>
+        <div class="card">
+          <p class="card-lab">Fields</p>
+          <p class="card-val" id="ta-fieldcount">—</p>
+          <p class="card-hint" id="ta-fieldtypes">—</p>
+        </div>
+      </div>
+
+      <div class="pill-row" id="ta-pills"></div>
+      <div id="ta-issues"></div>
+    </div>
+  </div>
+
+  <div class="group-title" style="margin-top: 2rem;">Byte cost by type</div>
+  <table class="type-table">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Example</th>
+        <th>Cost (K = key length)</th>
+        <th>Filter ops</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>String</td>
+        <td><code>"category":"news"</code></td>
+        <td><code>6 + K + V</code></td>
+        <td>$eq, $ne, $in, $nin, $exists</td>
+      </tr>
+      <tr>
+        <td>Integer</td>
+        <td><code>"chunk_number":1</code></td>
+        <td><code>4 + K + digits</code></td>
+        <td>$eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $exists</td>
+      </tr>
+      <tr>
+        <td>Float</td>
+        <td><code>"score":0.95</code></td>
+        <td><code>4 + K + digits</code></td>
+        <td>$eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $exists</td>
+      </tr>
+      <tr>
+        <td>Boolean</td>
+        <td><code>"is_public":true</code></td>
+        <td><code>4 + K + (4 or 5)</code></td>
+        <td>$eq, $ne, $exists</td>
+      </tr>
+      <tr>
+        <td>List of strings</td>
+        <td><code>"tags":["a","b"]</code></td>
+        <td><code>6 + K + N(L+2) + (N−1)</code></td>
+        <td>$eq (matches any member), $in, $nin</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="notes">
+    <p><strong>How bytes are counted.</strong> Pinecone measures the UTF-8 byte size of the flat JSON-stringified metadata object. The calculator sums braces <code>{}</code> (2 bytes) plus each field's <code>,"key":&lt;value&gt;</code> cost from the table above, minus 1 byte since the first field has no leading comma.</p>
+
+    <p><strong>Tokens to bytes.</strong> The widget assumes ~4 chars/token — the standard English BPE approximation. Non-ASCII text (accented characters, CJK, emoji) costs 2–4 bytes per character in UTF-8, so a 1024-token Japanese chunk can be double the size shown. Build in headroom for multilingual corpora.</p>
+
+    <p><strong>Pinecone metadata rules.</strong></p>
+    <ul>
+      <li>Metadata must be a <strong>flat</strong> JSON object — no nested objects.</li>
+      <li>Keys must be strings and <strong>cannot start with <code>$</code></strong>.</li>
+      <li>Values must be string, integer, floating point, boolean, or list of strings. Nothing else.</li>
+      <li>Integers are stored as 64-bit floats internally — the wire JSON keeps your digits, but beyond 2<sup>53</sup> you lose precision.</li>
+      <li><strong>Null values are not supported.</strong> Remove the key instead of setting it to null.</li>
+      <li>Lists can only contain strings. To store numeric-looking values in a list (like <code>["85","92"]</code> from the docs example), they must be stringified first.</li>
+    </ul>
+
+    <p><strong>Filtering implications.</strong> Booleans support only equality operators. Range operators (<code>$gt</code>, <code>$lt</code>, etc.) work on numbers only. <code>$in</code> and <code>$nin</code> each accept up to <strong>10,000 values per filter</strong>. If you need range-like filtering on categorical data, store it as numbers, not strings.</p>
+
+    <p><strong>Pre-upsert guardrail.</strong> Use <code>new TextEncoder().encode(JSON.stringify(metadata)).length</code> in JS (or <code>len(json.dumps(metadata).encode('utf-8'))</code> in Python) before upsert and reject or truncate around ~35 KB to leave safety margin for tokenizer variance and multi-byte characters.</p>
+
+    <p>Sources: <a href="https://docs.pinecone.io/guides/index-data/indexing-overview#metadata" target="_blank" rel="noopener">Indexing overview — metadata</a>, <a href="https://docs.pinecone.io/guides/get-started/concepts#record" target="_blank" rel="noopener">Concepts — record</a>, <a href="https://docs.pinecone.io/guides/search/filter-by-metadata" target="_blank" rel="noopener">Filter by metadata</a>.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var LIMIT = 40960;
+  var TOK_CHARS = 4;
+  var CHUNK_TEXT_KEY = 'chunk_text';
+  var CHUNK_TEXT_KEY_LEN = CHUNK_TEXT_KEY.length;
+  var SCALAR_VAL_AVG = 5; // mix of ints/floats/booleans
+
+  var LOREM = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt in culpa qui officia deserunt mollit anim id est laborum ";
+
+  var STRING_KEYS = ['document_id','document_title','author_name','source_url','section_header','file_path','tenant_id','project_id'];
+  var SCALAR_SAMPLES = [
+    {k: 'chunk_number', v: '1'},
+    {k: 'page', v: '42'},
+    {k: 'is_public', v: 'true'},
+    {k: 'year', v: '2024'},
+    {k: 'score', v: '0.95'},
+    {k: 'version', v: '3'},
+    {k: 'is_archived', v: 'false'},
+    {k: 'word_count', v: '1247'},
+    {k: 'confidence', v: '0.87'},
+    {k: 'rank', v: '12'}
+  ];
+  var LIST_KEYS = ['tags','categories','labels','keywords'];
+
+  var els = {
+    tok: document.getElementById('tok'),
+    k: document.getElementById('k'),
+    ns: document.getElementById('ns'),
+    sv: document.getElementById('sv'),
+    nn: document.getElementById('nn'),
+    nl: document.getElementById('nl'),
+    li: document.getElementById('li'),
+    lv: document.getElementById('lv')
+  };
+
+  var PRESETS = {
+    minimal:      {tok: 512,  k: 10, ns: 1,  sv: 15, nn: 0,  nl: 0, li: 5, lv: 8},
+    docs:         {tok: 256,  k: 12, ns: 2,  sv: 25, nn: 2,  nl: 2, li: 3, lv: 8},
+    rag:          {tok: 1024, k: 10, ns: 3,  sv: 30, nn: 3,  nl: 1, li: 5, lv: 8},
+    multitenant:  {tok: 1024, k: 12, ns: 8,  sv: 30, nn: 5,  nl: 2, li: 4, lv: 10},
+    textheavy:    {tok: 8192, k: 10, ns: 1,  sv: 20, nn: 1,  nl: 0, li: 5, lv: 8},
+    maxfields:    {tok: 256,  k: 8,  ns: 15, sv: 20, nn: 10, nl: 2, li: 5, lv: 8}
+  };
+
+  function fmt(n){ return Math.round(n).toLocaleString(); }
+
+  function makeText(bytes){
+    var out = '';
+    while(out.length < bytes) out += LOREM;
+    return out.slice(0, bytes);
+  }
+
+  function padKey(base, targetLen){
+    if(base.length >= targetLen) return base.slice(0, targetLen);
+    var pad = targetLen - base.length - 1;
+    return base + (pad > 0 ? '_' + 'x'.repeat(pad) : '_');
+  }
+
+  function calcBytes(c){
+    var K = c.k;
+    var textChars = c.tok * TOK_CHARS;
+
+    // chunk_text: ,"chunk_text":"<content>" = 6 + 10 + content
+    var textBytes = textChars > 0 ? (6 + CHUNK_TEXT_KEY_LEN + textChars) : 0;
+
+    // String fields: ,"key":"value" = 6 + K + V
+    var strBytes = c.ns * (6 + K + c.sv);
+
+    // Scalar fields (int/float/bool): ,"key":value = 4 + K + V
+    var scalarBytes = c.nn * (4 + K + SCALAR_VAL_AVG);
+
+    // List fields: ,"key":[items]
+    // items for N>=1: N*(L+2) + (N-1) = N*L + 3N - 1
+    var itemsBytes = c.li >= 1 ? (c.li * c.lv + 3 * c.li - 1) : 0;
+    var listBytes = c.nl * (6 + K + itemsBytes);
+
+    var base = 2; // braces
+
+    // Total fields count (to adjust for the leading comma we added to every field)
+    var hasAnyField = ((textChars > 0) ? 1 : 0) + c.ns + c.nn + c.nl > 0;
+    var commaAdjust = hasAnyField ? -1 : 0;
+
+    var total = base + textBytes + strBytes + scalarBytes + listBytes + commaAdjust;
+
+    return {
+      text: textBytes,
+      str: strBytes,
+      scalar: scalarBytes,
+      list: listBytes,
+      base: base + commaAdjust,
+      total: total,
+      perStringField: 6 + K + c.sv
+    };
+  }
+
+  function buildPreview(c){
+    var K = c.k;
+    var lines = ['{'];
+    var parts = [];
+
+    if(c.tok > 0){
+      var textChars = c.tok * TOK_CHARS;
+      var snippet = makeText(Math.min(textChars, 160));
+      var suffix = textChars > 160 ? '... (' + fmt(textChars) + ' chars total)' : '';
+      parts.push('  "' + CHUNK_TEXT_KEY + '": "' + snippet + suffix + '"');
+    }
+
+    var showStr = Math.min(c.ns, 4);
+    for(var i = 0; i < showStr; i++){
+      var key = padKey(STRING_KEYS[i % STRING_KEYS.length], K);
+      var vlen = Math.min(c.sv, 40);
+      var val = 'a'.repeat(vlen);
+      if(c.sv > 40) val += '... (' + c.sv + ' chars)';
+      parts.push('  "' + key + '": "' + val + '"');
+    }
+    if(c.ns > showStr){
+      parts.push('  // + ' + (c.ns - showStr) + ' more string field' + (c.ns - showStr === 1 ? '' : 's'));
+    }
+
+    var showScal = Math.min(c.nn, 4);
+    for(var j = 0; j < showScal; j++){
+      var sample = SCALAR_SAMPLES[j % SCALAR_SAMPLES.length];
+      var skey = padKey(sample.k, K);
+      parts.push('  "' + skey + '": ' + sample.v);
+    }
+    if(c.nn > showScal){
+      parts.push('  // + ' + (c.nn - showScal) + ' more scalar field' + (c.nn - showScal === 1 ? '' : 's'));
+    }
+
+    var showList = Math.min(c.nl, 3);
+    for(var l = 0; l < showList; l++){
+      var lkey = padKey(LIST_KEYS[l % LIST_KEYS.length], K);
+      var showItems = Math.min(c.li, 3);
+      var items = [];
+      for(var m = 0; m < showItems; m++){
+        var ilen = Math.min(c.lv, 20);
+        items.push('"' + 'a'.repeat(ilen) + '"');
+      }
+      var rest = c.li > showItems ? ', ... +' + (c.li - showItems) : '';
+      parts.push('  "' + lkey + '": [' + items.join(',') + rest + ']');
+    }
+    if(c.nl > showList){
+      parts.push('  // + ' + (c.nl - showList) + ' more list field' + (c.nl - showList === 1 ? '' : 's'));
+    }
+
+    if(parts.length === 0){
+      lines.push('  // empty metadata');
+    } else {
+      for(var p = 0; p < parts.length; p++){
+        var isComment = parts[p].indexOf('  //') === 0;
+        var nextIsComment = (p + 1 < parts.length) && parts[p+1].indexOf('  //') === 0;
+        var hasRealNext = false;
+        for(var q = p + 1; q < parts.length; q++){
+          if(parts[q].indexOf('  //') !== 0){ hasRealNext = true; break; }
+        }
+        var trailingComma = (!isComment && hasRealNext) ? ',' : '';
+        lines.push(parts[p] + trailingComma);
+      }
+    }
+    lines.push('}');
+    return lines.join('\n');
+  }
+
+  function update(){
+    var c = {
+      tok: parseInt(els.tok.value),
+      k: parseInt(els.k.value),
+      ns: parseInt(els.ns.value),
+      sv: parseInt(els.sv.value),
+      nn: parseInt(els.nn.value),
+      nl: parseInt(els.nl.value),
+      li: parseInt(els.li.value),
+      lv: parseInt(els.lv.value)
+    };
+
+    document.getElementById('tok-v').textContent = fmt(c.tok) + ' tok';
+    document.getElementById('k-v').textContent = c.k + ' chars';
+    document.getElementById('ns-v').textContent = c.ns;
+    document.getElementById('sv-v').textContent = c.sv + ' chars';
+    document.getElementById('nn-v').textContent = c.nn;
+    document.getElementById('nl-v').textContent = c.nl;
+    document.getElementById('li-v').textContent = c.li;
+    document.getElementById('lv-v').textContent = c.lv + ' chars';
+
+    var b = calcBytes(c);
+    var over = b.total > LIMIT;
+    var pct = (b.total / LIMIT) * 100;
+
+    document.getElementById('bytes').textContent = fmt(b.total) + ' / 40,960 bytes';
+    document.getElementById('used').textContent = fmt(b.total);
+    document.getElementById('rem').textContent = over ? '−' + fmt(b.total - LIMIT) : fmt(LIMIT - b.total);
+
+    var fText = document.getElementById('f-text');
+    var fStr = document.getElementById('f-str');
+    var fScal = document.getElementById('f-scal');
+    var fList = document.getElementById('f-list');
+
+    var denominator = over ? Math.max(1, b.total) : LIMIT;
+    if(over){
+      fText.style.background = 'var(--red)';
+      fStr.style.background = 'var(--red-d)';
+      fScal.style.background = 'var(--red)';
+      fList.style.background = 'var(--red-d)';
+    } else {
+      fText.style.background = 'var(--blue)';
+      fStr.style.background = 'var(--teal)';
+      fScal.style.background = 'var(--coral)';
+      fList.style.background = 'var(--purple)';
+    }
+    fText.style.width = (Math.max(0, b.text) / denominator * 100) + '%';
+    fStr.style.width = (Math.max(0, b.str) / denominator * 100) + '%';
+    fScal.style.width = (Math.max(0, b.scalar) / denominator * 100) + '%';
+    fList.style.width = (Math.max(0, b.list + b.base) / denominator * 100) + '%';
+
+    var more = over ? 0 : Math.max(0, Math.floor((LIMIT - b.total) / b.perStringField));
+    document.getElementById('more').textContent = over ? '0' : fmt(more);
+    document.getElementById('more-hint').textContent = 'at key=' + c.k + ', value=' + c.sv + ' chars (' + b.perStringField + ' B each)';
+    document.getElementById('prev').textContent = buildPreview(c);
+
+    var s = document.getElementById('status');
+    var anyField = c.tok > 0 || c.ns > 0 || c.nn > 0 || c.nl > 0;
+    if(over){
+      s.style.background = 'var(--red-bg)';
+      s.style.color = 'var(--red-text)';
+      s.textContent = 'Over budget by ' + fmt(b.total - LIMIT) + ' bytes. Pinecone will reject this upsert with a metadata size error.';
+    } else if(!anyField){
+      s.style.background = 'var(--info-bg)';
+      s.style.color = 'var(--info-text)';
+      s.textContent = 'Empty metadata — pick a preset or add fields to see the budget in use.';
+    } else if(pct > 85){
+      s.style.background = 'var(--amber-bg)';
+      s.style.color = 'var(--amber-text)';
+      s.textContent = Math.round(pct) + '% full — room for ~' + fmt(more) + ' more string fields. Multi-byte characters (CJK, emoji) could push this over; leave headroom.';
+    } else {
+      s.style.background = 'var(--green-bg)';
+      s.style.color = 'var(--green-text)';
+      s.textContent = Math.round(pct) + '% of the 40 KB budget used. Headroom for ~' + fmt(more) + ' more string fields at current sizes.';
+    }
+  }
+
+  window.apply = function(name){
+    var p = PRESETS[name];
+    if(!p) return;
+    els.tok.value = p.tok;
+    els.k.value = p.k;
+    els.ns.value = p.ns;
+    els.sv.value = p.sv;
+    els.nn.value = p.nn;
+    els.nl.value = p.nl;
+    els.li.value = p.li;
+    els.lv.value = p.lv;
+    update();
+  };
+
+  Object.keys(els).forEach(function(id){
+    els[id].addEventListener('input', update);
+  });
+  update();
+})();
+
+// ─── JSON Analyzer ─────────────────────────────────────────
+(function(){
+  var LIMIT = 40960;
+  var ta = document.getElementById('ta');
+  var results = document.getElementById('ta-results');
+
+  function fmt(n){ return Math.round(n).toLocaleString(); }
+
+  function escHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function classifyValue(v){
+    if(v === null) return 'null';
+    if(typeof v === 'string') return 'string';
+    if(typeof v === 'boolean') return 'boolean';
+    if(typeof v === 'number'){
+      return Number.isInteger(v) ? 'integer' : 'float';
+    }
+    if(Array.isArray(v)){
+      if(v.every(function(x){ return typeof x === 'string'; })) return 'list';
+      return 'bad_list';
+    }
+    if(typeof v === 'object') return 'object';
+    return 'unknown';
+  }
+
+  function analyze(text){
+    text = text.trim();
+    if(!text) return { empty: true };
+
+    var parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch(e) {
+      return { error: 'Invalid JSON: ' + e.message };
+    }
+
+    if(typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)){
+      return { error: 'Metadata must be a JSON object (wrapped in curly braces).' };
+    }
+
+    // Compact serialization — what Pinecone would ship
+    var serialized = JSON.stringify(parsed);
+    var encoded = new TextEncoder().encode(serialized);
+    var bytes = encoded.length;
+    var chars = serialized.length;
+    var multibyte = bytes - chars;
+
+    var counts = { string: 0, integer: 0, float: 0, boolean: 0, list: 0 };
+    var issues = [];
+    var keys = Object.keys(parsed);
+
+    keys.forEach(function(key){
+      var v = parsed[key];
+      var type = classifyValue(v);
+
+      if(key.startsWith('$')){
+        issues.push({ sev: 'err', msg: 'Key <code>' + escHtml(key) + '</code> starts with <code>$</code> — not allowed by Pinecone' });
+      }
+
+      if(type === 'null'){
+        issues.push({ sev: 'err', msg: 'Key <code>' + escHtml(key) + '</code> is <code>null</code> — not allowed, remove the key instead' });
+      } else if(type === 'object'){
+        issues.push({ sev: 'err', msg: 'Key <code>' + escHtml(key) + '</code> is a nested object — metadata must be flat' });
+      } else if(type === 'bad_list'){
+        issues.push({ sev: 'err', msg: 'Key <code>' + escHtml(key) + '</code> is a list containing non-strings — only lists of strings are allowed (stringify numbers: <code>["85","92"]</code>)' });
+      } else if(type === 'unknown'){
+        issues.push({ sev: 'err', msg: 'Key <code>' + escHtml(key) + '</code> has an unsupported type' });
+      } else {
+        counts[type]++;
+        // 2^53 precision warning for integers
+        if(type === 'integer' && Math.abs(v) > 9007199254740992){
+          issues.push({ sev: 'warn', msg: 'Key <code>' + escHtml(key) + '</code> exceeds 2<sup>53</sup> — may lose precision when Pinecone stores it as a 64-bit float' });
+        }
+      }
+    });
+
+    return {
+      bytes: bytes,
+      chars: chars,
+      multibyte: multibyte,
+      counts: counts,
+      issues: issues,
+      keyCount: keys.length,
+      over: bytes > LIMIT,
+      serialized: serialized
+    };
+  }
+
+  function renderPills(counts){
+    var types = [
+      { key: 'string', label: 'string' },
+      { key: 'integer', label: 'integer' },
+      { key: 'float', label: 'float' },
+      { key: 'boolean', label: 'boolean' },
+      { key: 'list', label: 'list' }
+    ];
+    return types.map(function(t){
+      var n = counts[t.key] || 0;
+      var cls = n > 0 ? 'pill has' : 'pill';
+      return '<span class="' + cls + '">' + n + ' ' + t.label + (n === 1 ? '' : 's') + '</span>';
+    }).join('');
+  }
+
+  function renderIssues(issues, over, bytes){
+    var html = '';
+
+    if(over){
+      html += '<div class="issue issue-err"><span class="issue-icon">!</span><span>Over 40,960 byte limit by <strong>' + fmt(bytes - LIMIT) + ' bytes</strong>. Pinecone will reject this upsert.</span></div>';
+    } else if(bytes > LIMIT * 0.85){
+      html += '<div class="issue issue-warn"><span class="issue-icon">!</span><span>Within <strong>' + fmt(LIMIT - bytes) + ' bytes</strong> of the limit. Leave margin for multi-byte characters if your data varies.</span></div>';
+    }
+
+    if(issues.length > 0){
+      issues.forEach(function(iss){
+        var cls = iss.sev === 'err' ? 'issue-err' : 'issue-warn';
+        var icon = iss.sev === 'err' ? '✕' : '!';
+        html += '<div class="issue ' + cls + '"><span class="issue-icon">' + icon + '</span><span>' + iss.msg + '</span></div>';
+      });
+    }
+
+    if(!over && bytes <= LIMIT * 0.85 && issues.length === 0){
+      html += '<div class="issue issue-ok"><span class="issue-icon">✓</span><span>Valid — passes all Pinecone metadata rules and fits in budget with headroom.</span></div>';
+    }
+
+    return html;
+  }
+
+  function updateAnalyzer(){
+    var r = analyze(ta.value);
+
+    if(r.empty){
+      results.style.display = 'none';
+      return;
+    }
+
+    results.style.display = 'block';
+
+    if(r.error){
+      document.getElementById('ta-bytes').textContent = '—';
+      document.getElementById('ta-fill').style.width = '0%';
+      document.getElementById('ta-exact').textContent = '—';
+      document.getElementById('ta-rem').textContent = '—';
+      document.getElementById('ta-fieldcount').textContent = '—';
+      document.getElementById('ta-pct').textContent = '';
+      document.getElementById('ta-char-diff').textContent = '';
+      document.getElementById('ta-fieldtypes').textContent = '';
+      document.getElementById('ta-pills').innerHTML = '';
+      document.getElementById('ta-issues').innerHTML =
+        '<div class="issue issue-err"><span class="issue-icon">✕</span><span>' + escHtml(r.error) + '</span></div>';
+      return;
+    }
+
+    var pct = (r.bytes / LIMIT) * 100;
+    var fill = document.getElementById('ta-fill');
+    fill.style.width = Math.min(100, pct) + '%';
+    fill.style.background = r.over ? 'var(--red)' : (pct > 85 ? 'var(--coral)' : 'var(--teal)');
+
+    document.getElementById('ta-bytes').textContent = fmt(r.bytes) + ' / 40,960 bytes';
+    document.getElementById('ta-exact').textContent = fmt(r.bytes);
+    document.getElementById('ta-char-diff').textContent = r.multibyte > 0
+      ? '+' + fmt(r.multibyte) + ' multi-byte overhead'
+      : r.chars + ' chars (ASCII)';
+    document.getElementById('ta-rem').textContent = r.over ? '−' + fmt(r.bytes - LIMIT) : fmt(LIMIT - r.bytes);
+    document.getElementById('ta-pct').textContent = Math.round(pct * 10) / 10 + '% of budget';
+    document.getElementById('ta-fieldcount').textContent = r.keyCount;
+
+    var typesUsed = Object.keys(r.counts).filter(function(k){ return r.counts[k] > 0; });
+    document.getElementById('ta-fieldtypes').textContent = typesUsed.length + ' type' + (typesUsed.length === 1 ? '' : 's') + ' used';
+
+    document.getElementById('ta-pills').innerHTML = renderPills(r.counts);
+    document.getElementById('ta-issues').innerHTML = renderIssues(r.issues, r.over, r.bytes);
+  }
+
+  window.loadExample = function(){
+    var ex = {
+      document_id: "document1",
+      document_title: "Introduction to Vector Databases",
+      chunk_number: 1,
+      chunk_text: "First chunk of the document content...",
+      is_public: true,
+      tags: ["beginner", "database", "vector-db"],
+      scores: ["85", "92"]
+    };
+    ta.value = JSON.stringify(ex, null, 2);
+    updateAnalyzer();
+  };
+
+  window.loadBigExample = function(){
+    // Build something close to 35 KB
+    var lorem = "Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ";
+    var chunk = '';
+    while(chunk.length < 34000) chunk += lorem;
+    chunk = chunk.slice(0, 34000);
+    var ex = {
+      document_id: "doc_abc_12345",
+      document_title: "Large chunk example near the Pinecone limit",
+      chunk_number: 42,
+      chunk_text: chunk,
+      author: "Jane Smith",
+      source_url: "https://example.com/docs/very-long-article",
+      is_public: true,
+      tags: ["deep-dive", "reference", "long-form"]
+    };
+    ta.value = JSON.stringify(ex, null, 2);
+    updateAnalyzer();
+  };
+
+  window.clearTa = function(){
+    ta.value = '';
+    updateAnalyzer();
+  };
+
+  ta.addEventListener('input', updateAnalyzer);
+})();
+</script>
+</body>
+</html>
