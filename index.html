@@ -209,7 +209,7 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     align-items: center;
   }
   .presets-lab {
@@ -272,7 +272,7 @@
   }
 
   .status {
-    margin-top: 1rem;
+    margin-top: 0.75rem;
     padding: 12px 14px;
     border-radius: var(--radius);
     font-size: 14px;
@@ -410,6 +410,34 @@
   @media (prefers-color-scheme: dark) {
     .issue code { background: rgba(255,255,255,0.1); }
   }
+
+  .customize-details {
+    margin-top: 0.25rem;
+  }
+  .customize-details > summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 13px;
+    color: var(--text-2);
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    border: 0.5px solid var(--border);
+  }
+  .customize-details > summary:hover { background: var(--bg-2); }
+  .customize-details > summary::-webkit-details-marker { display: none; }
+  .customize-details > summary::before {
+    content: '›';
+    font-size: 15px;
+    line-height: 1;
+    display: inline-block;
+    transition: transform 0.15s;
+  }
+  .customize-details[open] > summary::before { transform: rotate(90deg); }
+  .customize-details .group-title:first-of-type { margin-top: 1.25rem; }
 </style>
 </head>
 <body>
@@ -417,107 +445,7 @@
   <h1>Pinecone 40 KB metadata budget visualizer</h1>
   <p class="sub">Pinecone allows up to 40,960 bytes of metadata per record, measured as the UTF-8 byte size of the JSON-stringified flat object. Different value types cost different amounts — strings wear quotes, numbers and booleans don't, lists pay bracket and comma overhead per item.</p>
 
-  <div class="bar-wrap">
-    <div class="bar-top">
-      <span class="label">Metadata budget</span>
-      <span class="bytes" id="bytes">0 / 40,960 bytes</span>
-    </div>
-    <div class="track">
-      <div class="fill" id="f-text" style="width: 0%; background: var(--blue);"></div>
-      <div class="fill" id="f-str" style="width: 0%; background: var(--teal);"></div>
-      <div class="fill" id="f-scal" style="width: 0%; background: var(--coral);"></div>
-      <div class="fill" id="f-list" style="width: 0%; background: var(--purple);"></div>
-    </div>
-    <div class="bar-legend">
-      <span class="leg"><span class="sw" style="background: var(--blue);"></span>chunk_text</span>
-      <span class="leg"><span class="sw" style="background: var(--teal);"></span>String fields</span>
-      <span class="leg"><span class="sw" style="background: var(--coral);"></span>Scalar fields</span>
-      <span class="leg"><span class="sw" style="background: var(--purple);"></span>List fields + overhead</span>
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <p class="card-lab">Bytes used</p>
-      <p class="card-val" id="used">0</p>
-    </div>
-    <div class="card">
-      <p class="card-lab">Bytes remaining</p>
-      <p class="card-val" id="rem">40,960</p>
-    </div>
-    <div class="card">
-      <p class="card-lab">More string fields that fit</p>
-      <p class="card-val" id="more">—</p>
-      <p class="card-hint" id="more-hint">at current key &amp; value size</p>
-    </div>
-  </div>
-
-  <div class="presets">
-    <span class="presets-lab">Presets:</span>
-    <button class="btn" onclick="apply('minimal')">Minimal</button>
-    <button class="btn" onclick="apply('docs')">Pinecone docs example</button>
-    <button class="btn" onclick="apply('rag')">Typical RAG</button>
-    <button class="btn" onclick="apply('multitenant')">Rich multi-tenant</button>
-    <button class="btn" onclick="apply('textheavy')">Text-heavy</button>
-    <button class="btn" onclick="apply('maxfields')">Max fields</button>
-  </div>
-
-  <div class="group-title">Content</div>
-  <div class="row">
-    <label class="lab" for="tok">chunk_text (tokens)</label>
-    <input type="range" min="0" max="10000" step="64" value="1024" id="tok">
-    <span class="val" id="tok-v">1,024 tok</span>
-  </div>
-  <div class="row">
-    <label class="lab" for="k">Avg key length</label>
-    <input type="range" min="3" max="40" step="1" value="10" id="k">
-    <span class="val" id="k-v">10 chars</span>
-  </div>
-
-  <div class="group-title">String fields <span class="hint">— e.g. document_id, title, author, url</span></div>
-  <div class="row">
-    <label class="lab" for="ns">Number of string fields</label>
-    <input type="range" min="0" max="30" step="1" value="3" id="ns">
-    <span class="val" id="ns-v">3</span>
-  </div>
-  <div class="row">
-    <label class="lab" for="sv">Avg string value length</label>
-    <input type="range" min="1" max="500" step="1" value="25" id="sv">
-    <span class="val" id="sv-v">25 chars</span>
-  </div>
-
-  <div class="group-title">Scalar fields <span class="hint">— integers, floats, booleans (unquoted)</span></div>
-  <div class="row">
-    <label class="lab" for="nn">Number of scalar fields</label>
-    <input type="range" min="0" max="30" step="1" value="2" id="nn">
-    <span class="val" id="nn-v">2</span>
-  </div>
-
-  <div class="group-title">List fields <span class="hint">— lists of strings only, e.g. tags, categories</span></div>
-  <div class="row">
-    <label class="lab" for="nl">Number of list fields</label>
-    <input type="range" min="0" max="15" step="1" value="1" id="nl">
-    <span class="val" id="nl-v">1</span>
-  </div>
-  <div class="row">
-    <label class="lab" for="li">Items per list</label>
-    <input type="range" min="1" max="30" step="1" value="5" id="li">
-    <span class="val" id="li-v">5</span>
-  </div>
-  <div class="row">
-    <label class="lab" for="lv">Avg item length</label>
-    <input type="range" min="1" max="80" step="1" value="8" id="lv">
-    <span class="val" id="lv-v">8 chars</span>
-  </div>
-
-  <div style="margin-top: 1.5rem;">
-    <p class="pre-lab">Example JSON payload (what Pinecone would serialize)</p>
-    <pre class="pre" id="prev"></pre>
-  </div>
-
-  <div class="status" id="status"></div>
-
-  <div class="group-title" style="margin-top: 2.5rem;">Analyze your own JSON <span class="hint">— paste real metadata to check bytes &amp; Pinecone compliance</span></div>
+  <div class="group-title" style="margin-top: 0;">Analyze your own JSON <span class="hint">— paste real metadata to check bytes &amp; Pinecone compliance</span></div>
   <div class="ta-wrap">
     <textarea class="ta" id="ta" spellcheck="false" placeholder='Paste metadata JSON here, e.g.
 {
@@ -565,49 +493,111 @@
     </div>
   </div>
 
-  <div class="group-title" style="margin-top: 2rem;">Byte cost by type</div>
-  <table class="type-table">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Example</th>
-        <th>Cost (K = key length)</th>
-        <th>Filter ops</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>String</td>
-        <td><code>"category":"news"</code></td>
-        <td><code>6 + K + V</code></td>
-        <td>$eq, $ne, $in, $nin, $exists</td>
-      </tr>
-      <tr>
-        <td>Integer</td>
-        <td><code>"chunk_number":1</code></td>
-        <td><code>4 + K + digits</code></td>
-        <td>$eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $exists</td>
-      </tr>
-      <tr>
-        <td>Float</td>
-        <td><code>"score":0.95</code></td>
-        <td><code>4 + K + digits</code></td>
-        <td>$eq, $ne, $gt, $gte, $lt, $lte, $in, $nin, $exists</td>
-      </tr>
-      <tr>
-        <td>Boolean</td>
-        <td><code>"is_public":true</code></td>
-        <td><code>4 + K + (4 or 5)</code></td>
-        <td>$eq, $ne, $exists</td>
-      </tr>
-      <tr>
-        <td>List of strings</td>
-        <td><code>"tags":["a","b"]</code></td>
-        <td><code>6 + K + N(L+2) + (N−1)</code></td>
-        <td>$eq (matches any member), $in, $nin</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="group-title" style="margin-top: 2.5rem;">Budget calculator</div>
+
+  <div class="bar-wrap">
+    <div class="bar-top">
+      <span class="label">Metadata budget</span>
+      <span class="bytes" id="bytes">0 / 40,960 bytes</span>
+    </div>
+    <div class="track">
+      <div class="fill" id="f-text" style="width: 0%; background: var(--blue);"></div>
+      <div class="fill" id="f-str" style="width: 0%; background: var(--teal);"></div>
+      <div class="fill" id="f-scal" style="width: 0%; background: var(--coral);"></div>
+      <div class="fill" id="f-list" style="width: 0%; background: var(--purple);"></div>
+    </div>
+    <div class="bar-legend">
+      <span class="leg"><span class="sw" style="background: var(--blue);"></span>chunk_text</span>
+      <span class="leg"><span class="sw" style="background: var(--teal);"></span>String fields</span>
+      <span class="leg"><span class="sw" style="background: var(--coral);"></span>Scalar fields</span>
+      <span class="leg"><span class="sw" style="background: var(--purple);"></span>List fields + overhead</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <p class="card-lab">Bytes used</p>
+      <p class="card-val" id="used">0</p>
+    </div>
+    <div class="card">
+      <p class="card-lab">Bytes remaining</p>
+      <p class="card-val" id="rem">40,960</p>
+    </div>
+    <div class="card">
+      <p class="card-lab">More string fields that fit</p>
+      <p class="card-val" id="more">—</p>
+      <p class="card-hint" id="more-hint">at current key &amp; value size</p>
+    </div>
+  </div>
+
+  <div class="presets">
+    <span class="presets-lab">Presets:</span>
+    <button class="btn" onclick="apply('minimal')">Minimal</button>
+    <button class="btn" onclick="apply('docs')">Pinecone docs example</button>
+    <button class="btn" onclick="apply('rag')">Typical RAG</button>
+    <button class="btn" onclick="apply('multitenant')">Rich multi-tenant</button>
+    <button class="btn" onclick="apply('textheavy')">Text-heavy</button>
+    <button class="btn" onclick="apply('maxfields')">Max fields</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <details class="customize-details">
+    <summary>Customize fields</summary>
+
+    <div class="group-title">Content</div>
+    <div class="row">
+      <label class="lab" for="tok">chunk_text (tokens)</label>
+      <input type="range" min="0" max="10000" step="64" value="1024" id="tok">
+      <span class="val" id="tok-v">1,024 tok</span>
+    </div>
+    <div class="row">
+      <label class="lab" for="k">Avg key length</label>
+      <input type="range" min="3" max="40" step="1" value="10" id="k">
+      <span class="val" id="k-v">10 chars</span>
+    </div>
+
+    <div class="group-title">String fields <span class="hint">— e.g. document_id, title, author, url</span></div>
+    <div class="row">
+      <label class="lab" for="ns">Number of string fields</label>
+      <input type="range" min="0" max="30" step="1" value="3" id="ns">
+      <span class="val" id="ns-v">3</span>
+    </div>
+    <div class="row">
+      <label class="lab" for="sv">Avg string value length</label>
+      <input type="range" min="1" max="500" step="1" value="25" id="sv">
+      <span class="val" id="sv-v">25 chars</span>
+    </div>
+
+    <div class="group-title">Scalar fields <span class="hint">— integers, floats, booleans (unquoted)</span></div>
+    <div class="row">
+      <label class="lab" for="nn">Number of scalar fields</label>
+      <input type="range" min="0" max="30" step="1" value="2" id="nn">
+      <span class="val" id="nn-v">2</span>
+    </div>
+
+    <div class="group-title">List fields <span class="hint">— lists of strings only, e.g. tags, categories</span></div>
+    <div class="row">
+      <label class="lab" for="nl">Number of list fields</label>
+      <input type="range" min="0" max="15" step="1" value="1" id="nl">
+      <span class="val" id="nl-v">1</span>
+    </div>
+    <div class="row">
+      <label class="lab" for="li">Items per list</label>
+      <input type="range" min="1" max="30" step="1" value="5" id="li">
+      <span class="val" id="li-v">5</span>
+    </div>
+    <div class="row">
+      <label class="lab" for="lv">Avg item length</label>
+      <input type="range" min="1" max="80" step="1" value="8" id="lv">
+      <span class="val" id="lv-v">8 chars</span>
+    </div>
+
+    <div style="margin-top: 1.5rem; margin-bottom: 0.5rem;">
+      <p class="pre-lab">Example JSON payload (what Pinecone would serialize)</p>
+      <pre class="pre" id="prev"></pre>
+    </div>
+  </details>
 
   <div class="notes">
     <p><strong>How bytes are counted.</strong> Pinecone measures the UTF-8 byte size of the flat JSON-stringified metadata object. The calculator sums braces <code>{}</code> (2 bytes) plus each field's <code>,"key":&lt;value&gt;</code> cost from the table above, minus 1 byte since the first field has no leading comma.</p>
