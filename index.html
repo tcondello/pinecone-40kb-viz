@@ -472,9 +472,9 @@
 
       <div class="ta-summary">
         <div class="card">
-          <p class="card-lab">Exact UTF-8 bytes</p>
-          <p class="card-val" id="ta-exact">—</p>
-          <p class="card-hint" id="ta-char-diff">0 multi-byte chars</p>
+          <p class="card-lab">Protobuf bytes</p>
+          <p class="card-val" id="ta-proto">—</p>
+          <p class="card-hint">google.Struct encoding</p>
         </div>
         <div class="card">
           <p class="card-lab">Budget remaining</p>
@@ -970,8 +970,63 @@
       issues: issues,
       keyCount: keys.length,
       over: bytes > LIMIT,
-      serialized: serialized
+      serialized: serialized,
+      parsed: parsed
     };
+  }
+
+  // google.protobuf.Struct wire-size estimator
+  // Struct { map<string,Value> fields = 1 }
+  // Value { oneof: number_value=2(double/64-bit), string_value=3(LEN), bool_value=4(varint), list_value=6(LEN) }
+  // ListValue { repeated Value values = 1 }
+  function varintSize(n) {
+    if (n < 128) return 1;
+    if (n < 16384) return 2;
+    if (n < 2097152) return 3;
+    if (n < 268435456) return 4;
+    if (n < 34359738368) return 5;
+    return 6;
+  }
+
+  function protoValueSize(v, type) {
+    if (type === 'string') {
+      var slen = new TextEncoder().encode(String(v)).length;
+      return 1 + varintSize(slen) + slen; // tag(0x1A) + len + bytes
+    }
+    if (type === 'integer' || type === 'float') {
+      return 9; // tag(0x11) + 8-byte double
+    }
+    if (type === 'boolean') {
+      return 2; // tag(0x20) + 1-byte varint
+    }
+    if (type === 'list') {
+      var body = 0;
+      var enc = new TextEncoder();
+      for (var i = 0; i < v.length; i++) {
+        var ilen = enc.encode(v[i]).length;
+        var itemValSize = 1 + varintSize(ilen) + ilen; // string Value
+        body += 1 + varintSize(itemValSize) + itemValSize; // repeated Value field
+      }
+      return 1 + varintSize(body) + body; // tag(0x32) + len + ListValue body
+    }
+    return 0;
+  }
+
+  function calcProtoBytes(parsed) {
+    var enc = new TextEncoder();
+    var total = 0;
+    Object.keys(parsed).forEach(function(key) {
+      var v = parsed[key];
+      var type = classifyValue(v);
+      if (['string','integer','float','boolean','list'].indexOf(type) === -1) return;
+      var klen = enc.encode(key).length;
+      var vSize = protoValueSize(v, type);
+      // map entry: key subfield (tag 0x0A + len + bytes) + value subfield (tag 0x12 + len + msg)
+      var entryBody = (1 + varintSize(klen) + klen) + (1 + varintSize(vSize) + vSize);
+      // outer struct field: tag 0x0A + len + entry
+      total += 1 + varintSize(entryBody) + entryBody;
+    });
+    return total;
   }
 
   function renderPills(counts){
@@ -1026,11 +1081,10 @@
     if(r.error){
       document.getElementById('ta-bytes').textContent = '—';
       document.getElementById('ta-fill').style.width = '0%';
-      document.getElementById('ta-exact').textContent = '—';
+      document.getElementById('ta-proto').textContent = '—';
       document.getElementById('ta-rem').textContent = '—';
       document.getElementById('ta-fieldcount').textContent = '—';
       document.getElementById('ta-pct').textContent = '';
-      document.getElementById('ta-char-diff').textContent = '';
       document.getElementById('ta-fieldtypes').textContent = '';
       document.getElementById('ta-pills').innerHTML = '';
       document.getElementById('ta-issues').innerHTML =
@@ -1038,17 +1092,16 @@
       return;
     }
 
-    var pct = (r.bytes / LIMIT) * 100;
+    var protoBytes = calcProtoBytes(r.parsed);
+    var protoOver = protoBytes > LIMIT;
+    var pct = (protoBytes / LIMIT) * 100;
     var fill = document.getElementById('ta-fill');
     fill.style.width = Math.min(100, pct) + '%';
-    fill.style.background = r.over ? 'var(--red)' : (pct > 85 ? 'var(--coral)' : 'var(--teal)');
+    fill.style.background = protoOver ? 'var(--red)' : (pct > 85 ? 'var(--coral)' : 'var(--teal)');
 
-    document.getElementById('ta-bytes').textContent = fmt(r.bytes) + ' / 40,960 bytes';
-    document.getElementById('ta-exact').textContent = fmt(r.bytes);
-    document.getElementById('ta-char-diff').textContent = r.multibyte > 0
-      ? '+' + fmt(r.multibyte) + ' multi-byte overhead'
-      : r.chars + ' chars (ASCII)';
-    document.getElementById('ta-rem').textContent = r.over ? '−' + fmt(r.bytes - LIMIT) : fmt(LIMIT - r.bytes);
+    document.getElementById('ta-bytes').textContent = fmt(protoBytes) + ' / 40,960 bytes';
+    document.getElementById('ta-proto').textContent = fmt(protoBytes);
+    document.getElementById('ta-rem').textContent = protoOver ? '−' + fmt(protoBytes - LIMIT) : fmt(LIMIT - protoBytes);
     document.getElementById('ta-pct').textContent = Math.round(pct * 10) / 10 + '% of budget';
     document.getElementById('ta-fieldcount').textContent = r.keyCount;
 
@@ -1056,7 +1109,7 @@
     document.getElementById('ta-fieldtypes').textContent = typesUsed.length + ' type' + (typesUsed.length === 1 ? '' : 's') + ' used';
 
     document.getElementById('ta-pills').innerHTML = renderPills(r.counts);
-    document.getElementById('ta-issues').innerHTML = renderIssues(r.issues, r.over, r.bytes);
+    document.getElementById('ta-issues').innerHTML = renderIssues(r.issues, protoOver, protoBytes);
   }
 
   window.loadExample = function(){
