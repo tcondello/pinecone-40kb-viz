@@ -175,6 +175,7 @@
   }
   .btn:hover { background: var(--bg-2); }
   .btn:active { transform: scale(0.98); }
+  .btn.active { background: var(--bg-3); border-color: var(--text-3); }
 
   .card {
     background: var(--bg-2);
@@ -342,7 +343,7 @@
   .ta-wrap { margin-top: 0.5rem; }
   textarea.ta {
     width: 100%;
-    min-height: 140px;
+    min-height: 185px;
     font-family: var(--font-mono);
     font-size: 12.5px;
     padding: 12px 14px;
@@ -532,11 +533,11 @@
 
   <div class="presets">
     <span class="presets-lab">Presets:</span>
-    <button class="btn" onclick="apply('minimal')">Minimal</button>
-    <button class="btn" onclick="apply('docs')">Pinecone docs example</button>
-    <button class="btn" onclick="apply('rag')">Typical RAG</button>
-    <button class="btn" onclick="apply('multitenant')">Rich multi-tenant</button>
-    <button class="btn" onclick="apply('textheavy')">Text-heavy</button>    
+    <button class="btn" data-preset="minimal" onclick="apply('minimal')">Minimal</button>
+    <button class="btn" data-preset="docs" onclick="apply('docs')">Pinecone docs example</button>
+    <button class="btn" data-preset="rag" onclick="apply('rag')">Typical RAG</button>
+    <button class="btn" data-preset="multitenant" onclick="apply('multitenant')">Rich multi-tenant</button>
+    <button class="btn" data-preset="textheavy" onclick="apply('textheavy')">Text-heavy</button>    
   </div>
 
   <div class="status" id="status"></div>
@@ -874,6 +875,9 @@
     els.li.value = p.li;
     els.lv.value = p.lv;
     update();
+    document.querySelectorAll('.presets .btn').forEach(function(b){
+      b.classList.toggle('active', b.dataset.preset === name);
+    });
   };
 
   Object.keys(els).forEach(function(id){
